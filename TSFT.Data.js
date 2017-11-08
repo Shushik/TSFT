@@ -112,6 +112,7 @@ var TSFTData = TSFTData || (function() {
                 align      : raw.align == 'right' ? 'right' : '',
                 valign     : raw.valign && typeof raw.valign == 'string' ? raw.valign : '',
                 title      : typeof raw == 'string' ? raw : raw.title,
+                bgcolor    : raw.bgcolor && typeof raw.bgcolor == 'string' ? raw.bgcolor : '',
                 formula    : raw.formula && typeof raw.formula == 'string' ? raw.formula : ''
             }
 

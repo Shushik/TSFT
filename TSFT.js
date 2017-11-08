@@ -958,7 +958,7 @@ TSFT.View = TSFT.View || (function() {
          */
         _stylizeCol(data) {
             var
-                css = typeof data.css == 'string' ? data.css : '';
+                css = data.css && typeof data.css == 'string' ? data.css : '';
 
             // Add column text alignment
             if (data.align) {
@@ -970,12 +970,14 @@ TSFT.View = TSFT.View || (function() {
                 css += 'vertical-align:' + data.valign + ';'
             }
 
+            // Add column background color
+            if (data.bgcolor) {
+                css += 'background-color:' + data.bgcolor + ';';
+            }
+
             // Save column CSS
             if (css) {
-                this._addCSS(
-                    '.cells__rows .cells__cell:nth-child(' + data.id + ')',
-                    css
-                );
+                this.addCSS('.cells__rows .cells__cell:nth-child(' + data.id + ')', css);
             }
         }
 
@@ -1238,13 +1240,12 @@ TSFT.View = TSFT.View || (function() {
         /**
          * Add css code into table stylesheet
          *
-         * @private
-         * @method _addCSS
+         * @method addCSS
          *
          * @param {string} path
          * @param {string} code
          */
-        _addCSS(path, code) {
+        addCSS(path, code) {
             if (this._dom.css.addRule) {
                 this._dom.css.addRule(path, code);
             } else if (typeof this._dom.css.cssText == 'string') {
