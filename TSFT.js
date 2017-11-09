@@ -180,16 +180,6 @@ TSFT.Conf = TSFT.Conf || (function() {
     class self {
 
         /**
-         * Totals shorten indicator
-         *
-         * @static
-         * @const {string} TOTALS_SHORTEN
-         */
-        static get TOTALS_SHORTEN() {
-            return true;
-        }
-
-        /**
          * If table can be loaded by scroll
          *
          * @static
@@ -237,10 +227,8 @@ TSFT.Conf = TSFT.Conf || (function() {
          */
         static get TABLE_CSS_CODE() {
             return '' +
-                'body{font:normal 12px/14px Arial, Verdana, sans-serif;position:relative;margin:0;color:rgb(0, 0, 0)}' +
                 '*{font-size:100%}' +
-                '.cells{padding-bottom:25px}' +
-                '.cells_are_waiting{overflow:hidden}' +
+                '.cells{font:normal 12px/14px Arial, Verdana, sans-serif;position:relative;padding-bottom:25px;margin:0;color:rgb(0, 0, 0)}' +
                 '.cells_are_waiting::after{font-size:9px;line-height:9px;text-align:center;content:attr(data-wait);display:block;position:fixed;top:0;right:0;z-index:100500;padding:3px 10px;background:rgb(251, 247, 222);border-color:rgb(177, 177, 177);border-style:solid;border-width:0 0 1px 1px}' +
                 '.cells_are_waiting::before{content:"";cursor:progress;display:block;position:fixed;top:0;right:0;bottom:0;left:0;z-index:100500;background:rgba(0, 0, 0, 0.2)}' +
                 '.cells_view_rows .cells__none,.cells_view_none .cells__rows,.cells_no_bwd .cells__bwd,.cells_no_fwd .cells__fwd{display:none}' +
@@ -274,7 +262,7 @@ TSFT.Conf = TSFT.Conf || (function() {
                 '.cells__table{table-layout:fixed;border-spacing:0;border-collapse:separate;-webkit-box-sizing:border-box;box-sizing:border-box}' +
                 '.cells__title,.cells__total{padding-right:5px;padding-left:5px;-webkit-user-select:none;-moz-user-select:none;user-select:none}' +
                 '.cells__title{font-size:10px;line-height:15px;padding-top:2px}' +
-                '.cells__total{font-size:9px;font-weight:normal;' + (self.TOTALS_SHORTEN ? 'text-overflow:ellipsis;overflow:hidden;' : '') + 'padding-bottom:2px;margin-top:-2px}' +
+                '.cells__total{font-size:9px;font-weight:normal;padding-bottom:2px;margin-top:-2px}' +
                 '.cells__filter{font-weight:normal;cursor:not-allowed;height:14px;overflow:hidden;padding:2px 5px 2px 6px;margin:0 0 0 -1px;background:rgb(250, 250, 250);border-top:rgb(177, 177, 177) solid 1px}' +
                 '.cells__filter:focus{outline:none;background:rgb(255, 255, 255);box-shadow:0 1px 1px rgb(207, 207, 207) inset, 0 0 2px rgb(255, 217, 78), 0 0 2px rgb(255, 217, 78), 0 0 3px rgb(255, 217, 78)}' +
                 '.cells__filter[contenteditable]{cursor:text}';
@@ -429,10 +417,12 @@ TSFT.View = TSFT.View || (function() {
 
             // Set styles
             this._dom.iframe.setAttribute('style', self.parent.Conf.IFRAME_CSS_CODE);
+            this._dom.iframe.style.top      = '-9000px';
+            this._dom.iframe.style.left     = '-9000px';
+            this._dom.iframe.style.position = 'absolute';
 
             // Save the iframe into DOM
-            this._dom.target.innerHTML = '';
-            this._dom.target.appendChild(this._dom.iframe);
+            this._dom.target.parentNode.insertBefore(this._dom.iframe, this._dom.target);
 
             // Fetch main iframe nodes
             this._dom.win = this._dom.iframe.contentWindow;
@@ -670,6 +660,7 @@ TSFT.View = TSFT.View || (function() {
                 alias = event.type + '::' + event.target.classList[0];
 
             switch (alias) {
+                // 
                 case 'keyup::cells__filter':
                     switch(event.keyCode) {
                         case 13:
@@ -677,6 +668,7 @@ TSFT.View = TSFT.View || (function() {
                             break;
                     }
                     break;
+                // Block default enter key behavior
                 case 'keydown::cells__filter':
                     switch(event.keyCode) {
                         case 13:
@@ -684,6 +676,7 @@ TSFT.View = TSFT.View || (function() {
                             break;
                     }
                     break;
+                // Go to next or previous page
                 case 'mousedown::cells__bwd':
                 case 'mousedown::cells__fwd':
                     // Show table waiting indicator
@@ -695,6 +688,7 @@ TSFT.View = TSFT.View || (function() {
                         source  : {loop : event.target.getAttribute('data-from') - 1}
                     });
                     break;
+                // Order column
                 case 'mousedown::cells__title':
                 case 'mousedown::cells__total':
                     if (event.target.parentNode.classList.contains('cells__hat_is_sortable')) {
@@ -821,6 +815,14 @@ TSFT.View = TSFT.View || (function() {
             ) {
                 doc.scrollLeft = left;
                 delete this._dom.col;
+            }
+
+            if (this._dom.target) {
+                this._dom.target.parentNode.removeChild(this._dom.target);
+                this._dom.target = null;
+                this._dom.iframe.style.top      = '';
+                this._dom.iframe.style.left     = '';
+                this._dom.iframe.style.position = '';
             }
         }
 
@@ -959,6 +961,11 @@ TSFT.View = TSFT.View || (function() {
         _stylizeCol(data) {
             var
                 css = data.css && typeof data.css == 'string' ? data.css : '';
+
+            // Add column width
+            if (data.width) {
+                css += 'width:' + data.width + ';';
+            }
 
             // Add column text alignment
             if (data.align) {

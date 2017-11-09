@@ -107,11 +107,14 @@ var TSFTData = TSFTData || (function() {
                 countable  : raw.countable !== false ? true : false,
                 filterable : raw.filterable !== false ? true : false,
                 avg        : 0,
+                max        : 0,
+                min        : 0,
                 id         : id,
                 css        : raw.css && typeof raw.css == 'string' ? raw.css : '',
                 align      : raw.align == 'right' ? 'right' : '',
                 valign     : raw.valign && typeof raw.valign == 'string' ? raw.valign : '',
-                title      : typeof raw == 'string' ? raw : raw.title,
+                title      : raw.title ? raw.title : '#' + id,
+                width      : raw.width && typeof raw.width == 'string' ? raw.width : '',
                 bgcolor    : raw.bgcolor && typeof raw.bgcolor == 'string' ? raw.bgcolor : '',
                 formula    : raw.formula && typeof raw.formula == 'string' ? raw.formula : ''
             }
