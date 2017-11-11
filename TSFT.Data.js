@@ -18,8 +18,7 @@ var TSFTData = TSFTData || (function() {
 
             // Bind some methods to the instance context
             this._route         = this._route.bind(this);
-            this._compareNumber = this._compareNumber.bind(this);
-            this._compareString = this._compareString.bind(this);
+            this._compareCommon = this._compareCommon.bind(this);
 
             // Set events handlers
             this._live();
@@ -61,9 +60,6 @@ var TSFTData = TSFTData || (function() {
 
             // 
             this._data.sort = {
-                pos   : 0,
-                col   : '',
-                order : ''
             };
 
             // 
@@ -73,9 +69,8 @@ var TSFTData = TSFTData || (function() {
             // Add columns data
             args.cols.forEach(this._addCol, this);
 
-            // Typify columns
+            // Add rows data
             if (args.rows.length) {
-                // Add rows data
                 args.rows.forEach(this._addRow, this);
             }
 
@@ -98,83 +93,45 @@ var TSFTData = TSFTData || (function() {
         _addCol(raw, pos) {
             var
                 id   = pos + 1 + '',
+                type = typeof raw.type == 'string' && raw.type.match(/(number|date)/) ?
+                       raw.type.substring(0, 1).toUpperCase() + raw.type.substring(1) :
+                       'String',
                 data = {};
 
             // Save column structure
-            this._data.cols.items[id] = {
+            data = {
                 virtual    : raw.virtual ? true : false,
                 sortable   : !raw.virtual && raw.sortable !== false ? true : false,
                 countable  : raw.countable !== false ? true : false,
                 filterable : raw.filterable !== false ? true : false,
-                avg        : 0,
-                max        : 0,
-                min        : 0,
                 id         : id,
                 css        : raw.css && typeof raw.css == 'string' ? raw.css : '',
+                type       : type,
                 align      : raw.align == 'right' ? 'right' : '',
                 valign     : raw.valign && typeof raw.valign == 'string' ? raw.valign : '',
                 title      : raw.title ? raw.title : '#' + id,
                 width      : raw.width && typeof raw.width == 'string' ? raw.width : '',
                 bgcolor    : raw.bgcolor && typeof raw.bgcolor == 'string' ? raw.bgcolor : '',
-                formula    : raw.formula && typeof raw.formula == 'string' ? raw.formula : ''
+                formula    : raw.formula && typeof raw.formula == 'string' ?
+                             raw.formula :
+                             ''
             }
+
+            // 
+            switch (type) {
+                case 'Number':
+                    data.avg = 0;
+                    data.max = undefined;
+                    data.min = undefined;
+                    data.sum = 0;
+                    break;
+            }
+
+            // Save column settings
+            this._data.cols.items[id] = data;
 
             // Save column id
             this._data.cols.order.push(id);
-        }
-
-        /**
-         * Typify column
-         *
-         * @private
-         * @method _typifyCol
-         *
-         * @param {object} raw
-         * @param {number} pos
-         */
-        _typifyCol(raw, pos) {
-            var
-                id      = pos + 1 + '',
-                val     = typeof raw == 'object' ? raw.value : raw,
-                type    = typeof val,
-                formula = '',
-                col     = this._data.cols.items[id];
-
-            // Set internal column type
-            switch (type) {
-                case 'object':
-                    if (val instanceof Date) {
-                        col.avg = 0;
-                        col.max = val;
-                        col.min = val;
-
-                        type    = 'Number';
-                        formula = '{{ ' + id + '.avg }}';
-                    } else {
-                        type    = 'String';
-                        formula = '{{ ' + id + '.rows }}';
-                    }
-                    break;
-                case 'number':
-                    col.avg = 0;
-                    col.max = val;
-                    col.min = val;
-
-                    type    = 'Number';
-                    formula = '{{ ' + id + '.avg }}';
-                    break;
-                default:
-                    type    = 'String';
-                    formula = '{{ ' + id + '.rows }}'
-                    break;
-            }
-
-            // Save type
-            col.type = type;
-
-            if (!col.formula) {
-                col.formula = formula;
-            }
         }
 
         /**
@@ -189,12 +146,6 @@ var TSFTData = TSFTData || (function() {
         _addRow(raw, pos) {
             var
                 id  = pos + 1 + '';
-
-            // Typify columns
-            if (pos === 0 && !this._data.cols.typifyed) {
-                this._data.cols.typifyed = true;
-                raw.forEach(this._typifyCol, this);
-            }
 
             // Fill row with the cells
             this._data.rows.cache = [];
@@ -220,11 +171,14 @@ var TSFTData = TSFTData || (function() {
          */
         _addCell(raw, pos) {
             var
-                col = pos + 1 + '';
+                col   = pos + 1 + '',
+                type  = this._data.cols.items[col].type,
+                title = raw.title !== undefined ? raw.title : raw.value + '',
+                value = raw.value;
 
             this._data.rows.cache.push({
-                title : raw.title !== undefined ? raw.title : raw.value + '',
-                value : raw.value
+                title : title,
+                value : value
             });
 
             this._countTotal(raw, pos);
@@ -246,12 +200,11 @@ var TSFTData = TSFTData || (function() {
             if (!col.virtual) {
                 if (formula = col.formula) {
                     formula = formula.
-                              replace(/\{\{[\s]*(avg|max|min)*[\s]\}\}/g, 'this._data.cols.items[\'' + id + '\'].$1').
-                              replace(/\{\{[\s]*([^\.]+)\.(avg|max|min)[\s]*\}\}/g, 'this._data.cols.items[\'$1\'].$2').
+                              replace(/\{\{[\s]*(avg|max|min|sum)*[\s]\}\}/g, 'this._data.cols.items[\'' + id + '\'].$1').
+                              replace(/\{\{[\s]*([^\.]+)\.(avg|max|min|sum)[\s]*\}\}/g, 'this._data.cols.items[\'$1\'].$2').
                               replace(/\{\{[\s]*rows[\s]*\}\}/g, 'this._data.rows.order.length').
                               replace(/\{\{[\s]*([^\.]+)\.rows[\s]*\}\}/g, 'this._data.rows.order.length').
                               replace(/\{\{[\s]*cell\.([^\.]+)\.([^\s]+)\.val[\s]*\}\}/g, 'this._data.rows.items[\'$1\'][\'$2\'].value');
-
                     this._data.cols.cache[id] = eval('(' + formula + ')');
                 } else {
                     this._data.cols.cache[id] = '';
@@ -317,7 +270,7 @@ var TSFTData = TSFTData || (function() {
         }
 
         /**
-         * Select rows
+         * Select row
          *
          * @private
          * @method _selectRow
@@ -365,13 +318,16 @@ var TSFTData = TSFTData || (function() {
                     order : order
                 }
 
-                this._data.rows.order.sort(this['_compare' + this._data.cols.items[col].type]);
+                // Run array sort
+                this._data.rows.order.sort(this._compareCommon);
 
+                // Run array reverse
                 if (order == 'desc') {
                     this._data.rows.order.reverse();
                 }
             }
 
+            //
             self.postMessage({
                 slug     : this._slug,
                 response : 'order rows'
@@ -382,45 +338,14 @@ var TSFTData = TSFTData || (function() {
          * Compare number cells
          *
          * @private
-         * @method _compareNumber
+         * @method _compareCommon
          *
          * @param {object} a
          * @param {object} b
          *
          * @returns {number}
          */
-        _compareNumber(a, b) {
-            var
-                ac = this._data.rows.items[a][this._data.sort.pos],
-                bc = this._data.rows.items[b][this._data.sort.pos];
-
-            if (ac.value > bc.value) {
-                return 1;
-            } else if (ac.value < bc.value) {
-                return -1;
-            } else if (ac.value == bc.value) {
-                if (ac.id < bc.id) {
-                    return 1;
-                } else if (ac.id > bc.id) {
-                    return -1;
-                }
-            }
-
-            return 0;
-        }
-
-        /**
-         * Compare string cells
-         *
-         * @private
-         * @method _compareString
-         *
-         * @param {object} a
-         * @param {object} b
-         *
-         * @returns {number}
-         */
-        _compareString(a, b) {
+        _compareCommon(a, b) {
             var
                 ac = this._data.rows.items[a][this._data.sort.pos],
                 bc = this._data.rows.items[b][this._data.sort.pos];
@@ -528,7 +453,7 @@ var TSFTData = TSFTData || (function() {
 
             if (
                 this._data.filter.vals[col] &&
-                (cell.value + '').match(this._data.filter.vals[col])
+                cell.title.match(this._data.filter.vals[col])
             ) {
                 return true;
             }
@@ -615,7 +540,19 @@ var TSFTData = TSFTData || (function() {
             var
                 id = pos + 1;
 
-            if (this._data.cols.items[id].virtual === false) {
+            if (typeof data == 'number') {
+                // 
+                data = this._data.rows.items[data];
+                data = data instanceof Array ? data[id] : null;
+                data = data ? data.value : null;
+
+                // Send response message
+                self.postMessage({
+                    slug     : this._slug,
+                    response : 'select cell',
+                    source   : data
+                });
+            } else if (this._data.cols.items[id].virtual === false) {
                 this._data.rows.cache.row.cells.push(data);
             }
         }
@@ -636,9 +573,10 @@ var TSFTData = TSFTData || (function() {
 
             switch (col.type) {
                 case 'Number':
-                    col.avg += cell.value;
-                    col.max = Math.max(cell.value, col.max);
-                    col.min = Math.min(cell.value, col.min);
+                    col.sum += cell.value;
+                    col.avg = col.sum / this._data.rows.order.length;
+                    col.max = col.max !== undefined ? Math.max(cell.value, col.max) : cell.value;
+                    col.min = col.min !== undefined ? Math.min(cell.value, col.min) : cell.value;
                     break;
             }
         }
@@ -703,21 +641,31 @@ var TSFTData = TSFTData || (function() {
             }
 
             switch (event.data.request) {
+                // 
                 case 'init data':
                     this._init(event.data.source);
                     break;
+                // 
                 case 'count cols':
                     this._countCols();
                     break;
+                // 
+                case 'select cell':
+                    this._selectCell(event.data.source.row, event.data.source.cell);
+                    break;
+                // 
                 case 'select cols':
                     this._selectCols();
                     break;
+                // 
                 case 'order rows':
                     this._orderRows(event.data.source.col, event.data.source.order);
                     break;
+                // 
                 case 'filter rows':
                     this._filterRows(event.data.source.values);
                     break;
+                // 
                 case 'select rows':
                     this._selectRows(
                         event.data.source ? event.data.source.start : 0,

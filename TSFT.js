@@ -22,6 +22,9 @@ var TSFT = TSFT || (function() {
             // Bind some methods to the instance context
             this._route = this._route.bind(this);
 
+            // 
+            this._wait = {};
+
             // Initiate data and view modules
             this._data = new Worker(self.Conf.WORKER_LINK);
             this._view = new self.View({target : args.target});
@@ -38,6 +41,17 @@ var TSFT = TSFT || (function() {
                               rows : args.rows
                           }
             });
+        }
+
+        /**
+         * Set events handlers
+         *
+         * @private
+         * @method _die
+         */
+        _die() {
+            this._data.removeEventListener('message', this._route);
+            window.removeEventListener('message', this._route);
         }
 
         /**
@@ -105,6 +119,9 @@ var TSFT = TSFT || (function() {
                         request : 'select cols'
                     });
                     break;
+                case 'response select cell':
+                    this._wait['select cell'](event.data.source);
+                    break;
                 case 'response select cols':
                     this._view.postMessage({
                         slug    : this._slug,
@@ -164,6 +181,46 @@ var TSFT = TSFT || (function() {
             }
         }
 
+        selectCell(row, cell, success, error) {
+            new Promise((success, error) => {
+                // 
+                this._wait['select cell'] = success;
+
+                // 
+                this._data.postMessage({
+                    slug    : this._slug,
+                    request : 'select cell',
+                    source  : {
+                                  row  : row,
+                                  cell : cell
+                              }
+                });
+
+                // 
+                if (typeof error == 'function') {
+                    setTimeout(() => {
+                        error();
+                    }, self.Conf.TABLE_REQUEST_TIMEOUT);
+                }
+            }).
+            then(success).
+            catch(error);
+        }
+
+        /**
+         * Uninstall module
+         */
+        uninstall() {
+            this._die();
+
+            this._data.terminate();
+
+            delete this._data;
+            delete this._slug;
+            delete this._view;
+            delete this._route;
+        }
+
     }
 
     return self;
@@ -217,6 +274,16 @@ TSFT.Conf = TSFT.Conf || (function() {
          */
         static get TABLE_FILTER_DELAY() {
             return 300;
+        }
+
+        /**
+         * Table requests timeout
+         *
+         * @static
+         * @const {number} TABLE_REQUEST_TIMEOUT
+         */
+        static get TABLE_REQUEST_TIMEOUT() {
+            return 1500;
         }
 
         /**
@@ -435,6 +502,19 @@ TSFT.View = TSFT.View || (function() {
 
             // Set events handlers
             this._live();
+        }
+
+        /**
+         * Unset events handlers
+         *
+         * @private
+         * @method _die
+         */
+        _die() {
+            this._dom.win.removeEventListener('keyup', this._route);
+            this._dom.win.removeEventListener('keydown', this._route);
+            this._dom.doc.body.removeEventListener('mousedown', this._route);
+            this._dom.iframe.contentWindow.removeEventListener('message', this._routeMessage);
         }
 
         /**
@@ -833,8 +913,9 @@ TSFT.View = TSFT.View || (function() {
          * @method _renderCol
          *
          * @param {object} data
+         * @param {number} pos
          */
-        _renderCol(data) {
+        _renderCol(data, pos) {
             var
                 css  = '',
                 th   = this._dom.doc.createElement('th'),
@@ -843,7 +924,8 @@ TSFT.View = TSFT.View || (function() {
 
             // Set order and other
             th.className = 'cells__hat ' +
-                           'cells__hat_id_' + data.id;
+                           'cells__hat_id_' + data.id + ' ' +
+                           'cells__hat_type_' + data.type.toLowerCase();
 
             // Render column sort control
             this._renderColSort(th, data);
@@ -870,7 +952,7 @@ TSFT.View = TSFT.View || (function() {
             this._dom.cache.head.appendChild(col);
 
             // Stylize column
-            this._stylizeCol(data);
+            this._stylizeCol(data, pos);
         }
 
         /**
@@ -957,8 +1039,9 @@ TSFT.View = TSFT.View || (function() {
          * @method _stylizeCol
          *
          * @param {object} data
+         * @param {number} pos
          */
-        _stylizeCol(data) {
+        _stylizeCol(data, pos) {
             var
                 css = data.css && typeof data.css == 'string' ? data.css : '';
 
@@ -984,7 +1067,7 @@ TSFT.View = TSFT.View || (function() {
 
             // Save column CSS
             if (css) {
-                this.addCSS('.cells__rows .cells__cell:nth-child(' + data.id + ')', css);
+                this.addCSS('.cells__rows .cells__cell:nth-child(' + (pos + 1) + ')', css);
             }
         }
 
@@ -1024,7 +1107,7 @@ TSFT.View = TSFT.View || (function() {
             var
                 td = this._dom.doc.createElement('td');
 
-            td.className = 'cells__cell';
+            td.className = 'cells__cell cells__cell_col_';
             td.innerHTML = data.title;
 
             this._dom.cache.row.appendChild(td);
@@ -1273,6 +1356,23 @@ TSFT.View = TSFT.View || (function() {
          */
         postMessage(data) {
             this._dom.iframe.contentWindow.postMessage(data, '*');
+        }
+
+        /**
+         * Uninstall view module instance
+         *
+         * @method uninstall
+         */
+        uninstall() {
+            this._die();
+            this._dom.iframe.parentNode.removeChild(this._dom.iframe);
+
+            delete this._dom;
+            delete this._data;
+            delete this._slug;
+            delete this._route;
+            delete this._routeMessage;
+            delete this._timers;
         }
 
         /**
