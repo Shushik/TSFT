@@ -93,7 +93,7 @@ var TSFTData = TSFTData || (function() {
         _addCol(raw, pos) {
             var
                 id   = pos + 1 + '',
-                type = typeof raw.type == 'string' && raw.type.match(/(number|date)/) ?
+                type = typeof raw.type == 'string' && raw.type.match(/(number|date|enum)/) ?
                        raw.type.substring(0, 1).toUpperCase() + raw.type.substring(1) :
                        'String',
                 data = {};
@@ -108,17 +108,26 @@ var TSFTData = TSFTData || (function() {
                 css        : raw.css && typeof raw.css == 'string' ? raw.css : '',
                 type       : type,
                 align      : raw.align == 'right' ? 'right' : '',
-                valign     : raw.valign && typeof raw.valign == 'string' ? raw.valign : '',
+                valign     : raw.valign && typeof raw.valign == 'string' ?
+                             raw.valign :
+                             '',
                 title      : raw.title ? raw.title : '#' + id,
                 width      : raw.width && typeof raw.width == 'string' ? raw.width : '',
-                bgcolor    : raw.bgcolor && typeof raw.bgcolor == 'string' ? raw.bgcolor : '',
+                bgcolor    : raw.bgcolor && typeof raw.bgcolor == 'string' ?
+                             raw.bgcolor :
+                             '',
                 formula    : raw.formula && typeof raw.formula == 'string' ?
                              raw.formula :
                              ''
-            }
+            };
 
-            // 
+            // Add specifical fields to column structure
             switch (type) {
+                case 'Enum':
+                    data.value = raw.value && typeof raw.value == 'string' ?
+                                 raw.value :
+                                 '';
+                    break;
                 case 'Number':
                     data.avg = 0;
                     data.max = undefined;
@@ -171,10 +180,22 @@ var TSFTData = TSFTData || (function() {
          */
         _addCell(raw, pos) {
             var
-                col   = pos + 1 + '',
-                type  = this._data.cols.items[col].type,
+                id    = pos + 1 + '',
+                col   = this._data.cols.items[id],
+                type  = col.type,
                 title = raw.title !== undefined ? raw.title : raw.value + '',
                 value = raw.value;
+
+            switch (type) {
+                case 'Enum':
+                    value = col.value.indexOf(value + '');
+
+                    if (value == -1) {
+                        value = 0;
+                        title = col.value.split(',')[0];
+                    }
+                    break;
+            }
 
             this._data.rows.cache.push({
                 title : title,
@@ -199,12 +220,22 @@ var TSFTData = TSFTData || (function() {
 
             if (!col.virtual) {
                 if (formula = col.formula) {
-                    formula = formula.
-                              replace(/\{\{[\s]*(avg|max|min|sum)*[\s]\}\}/g, 'this._data.cols.items[\'' + id + '\'].$1').
-                              replace(/\{\{[\s]*([^\.]+)\.(avg|max|min|sum)[\s]*\}\}/g, 'this._data.cols.items[\'$1\'].$2').
-                              replace(/\{\{[\s]*rows[\s]*\}\}/g, 'this._data.rows.order.length').
-                              replace(/\{\{[\s]*([^\.]+)\.rows[\s]*\}\}/g, 'this._data.rows.order.length').
-                              replace(/\{\{[\s]*cell\.([^\.]+)\.([^\s]+)\.val[\s]*\}\}/g, 'this._data.rows.items[\'$1\'][\'$2\'].value');
+                    formula = formula.replace(
+                                  /\{\{[\s]*(avg|max|min|sum)*[\s]\}\}/g,
+                                  'this._data.cols.items[\'' + id + '\'].$1'
+                              ).replace(
+                                  /\{\{[\s]*([^\.]+)\.(avg|max|min|sum)[\s]*\}\}/g,
+                                  'this._data.cols.items[\'$1\'].$2'
+                              ).replace(
+                                  /\{\{[\s]*rows[\s]*\}\}/g,
+                                  'this._data.rows.order.length'
+                              ).replace(
+                                  /\{\{[\s]*([^\.]+)\.rows[\s]*\}\}/g,
+                                  'this._data.rows.order.length'
+                              ).replace(
+                                  /\{\{[\s]*cell\.([^\.]+)\.([^\s]+)\.val[\s]*\}\}/g,
+                                  'this._data.rows.items[\'$1\'][\'$2\'].value'
+                              );
                     this._data.cols.cache[id] = eval('(' + formula + ')');
                 } else {
                     this._data.cols.cache[id] = '';
@@ -391,7 +422,9 @@ var TSFTData = TSFTData || (function() {
                 this._data.filter.cols++;
 
                 this._data.filter.vals[al0] = new RegExp(
-                    values[al0].replace(/([\.\?}{\]\[])/g, '\\$1').replace(/([^\\]?)\*/, '$1.+'),
+                    values[al0].
+                    replace(/([\.\?}{\]\[])/g, '\\$1').
+                    replace(/([^\\]?)\*/, '$1.*'),
                     'i'
                 );
             }
@@ -575,8 +608,12 @@ var TSFTData = TSFTData || (function() {
                 case 'Number':
                     col.sum += cell.value;
                     col.avg = col.sum / this._data.rows.order.length;
-                    col.max = col.max !== undefined ? Math.max(cell.value, col.max) : cell.value;
-                    col.min = col.min !== undefined ? Math.min(cell.value, col.min) : cell.value;
+                    col.max = col.max !== undefined ?
+                              Math.max(cell.value, col.max) :
+                              cell.value;
+                    col.min = col.min !== undefined ?
+                              Math.min(cell.value, col.min) :
+                              cell.value;
                     break;
             }
         }

@@ -22,8 +22,11 @@ var TSFT = TSFT || (function() {
             // Bind some methods to the instance context
             this._route = this._route.bind(this);
 
-            // 
+            // Create module
             this._wait = {};
+
+            // Create module timers stack
+            this._timers = {};
 
             // Initiate data and view modules
             this._data = new Worker(self.Conf.WORKER_LINK);
@@ -85,6 +88,7 @@ var TSFT = TSFT || (function() {
                         'response ' + event.data.response;
 
             switch (alias) {
+                // Run data table order
                 case 'request order rows':
                     this._data.postMessage({
                         slug    : this._slug,
@@ -92,6 +96,7 @@ var TSFT = TSFT || (function() {
                         source  : event.data.source
                     });
                     break;
+                // Run data table filtering
                 case 'request filter rows':
                     this._data.postMessage({
                         slug    : this._slug,
@@ -99,12 +104,14 @@ var TSFT = TSFT || (function() {
                         source  : event.data.source
                     });
                     break;
+                // Run view table unlock action
                 case 'response unlock view':
                     this._view.postMessage({
                         slug    : this._slug,
                         request : 'unlock view'
                     });
                     break;
+                // Run view init actions
                 case 'response init data':
                     this._view.postMessage({
                         request : 'init view',
@@ -113,15 +120,20 @@ var TSFT = TSFT || (function() {
                         }
                     });
                     break;
+                // Run data columns selection
                 case 'response init view':
                     this._data.postMessage({
                         slug    : this._slug,
                         request : 'select cols'
                     });
                     break;
+                // Run data cell selection success handler
                 case 'response select cell':
-                    this._wait['select cell'](event.data.source);
+                    if (this._wait['select cell'] && this._wait['select cell'].success) {
+                        this._wait['select cell'].success(event.data.source);
+                    }
                     break;
+                // Run view table columns rendering
                 case 'response select cols':
                     this._view.postMessage({
                         slug    : this._slug,
@@ -129,6 +141,7 @@ var TSFT = TSFT || (function() {
                         source  : event.data.source
                     });
                     break;
+                // Run view table rows or none rendering
                 case 'response select rows':
                     if (event.data.source.list && event.data.source.list.length) {
                         this._view.postMessage({
@@ -143,6 +156,8 @@ var TSFT = TSFT || (function() {
                         });
                     }
                     break;
+                // Run data table rows selection
+                case 'request select rows':
                 case 'response order rows':
                 case 'response filter rows':
                 case 'response render cols':
@@ -150,27 +165,21 @@ var TSFT = TSFT || (function() {
                         slug    : this._slug,
                         request : 'select rows',
                         source  : {
-                                      start : 0,
+                                      start : event.data.source && event.data.source.loop ?
+                                              event.data.source.loop :
+                                              0,
                                       limit : self.Conf.TABLE_ROWS_LIMIT
                                   }
                     });
                     break;
-                case 'request select rows':
-                    this._data.postMessage({
-                        slug    : this._slug,
-                        request : 'select rows',
-                        source  : {
-                                      start : event.data.source.loop,
-                                      limit : self.Conf.TABLE_ROWS_LIMIT
-                                  }
-                    });
-                    break;
+                // Run data table columns count
                 case 'response render rows':
                     this._data.postMessage({
                         slug    : this._slug,
                         request : 'count cols'
                     });
                     break;
+                // Run view table totals rendering
                 case 'response count cols':
                     this._view.postMessage({
                         slug    : this._slug,
@@ -181,30 +190,47 @@ var TSFT = TSFT || (function() {
             }
         }
 
-        selectCell(row, cell, success, error) {
-            new Promise((success, error) => {
-                // 
-                this._wait['select cell'] = success;
+        /**
+         * Request table values from data
+         *
+         * @method request
+         *
+         * @param {string}   subject
+         * @param {object}   args
+         * @param {function} success
+         * @param {function} error
+         *
+         * @returns {object}
+         */
+        request(subject, args, success, error) {
+            // Call error handler for the previous promise
+            if (this._wait[subject]) {
+                this._wait[subject].error();
+            }
 
-                // 
+            // Create promise
+            return new Promise((success, error) => {
+                // Cache error and success handlers
+                this._wait[subject] = {
+                    error   : error,
+                    success : success
+                };
+
+                // Send data request
                 this._data.postMessage({
                     slug    : this._slug,
-                    request : 'select cell',
-                    source  : {
-                                  row  : row,
-                                  cell : cell
-                              }
+                    request : subject,
+                    source  : args
                 });
 
-                // 
+                // Quit by timeout
                 if (typeof error == 'function') {
-                    setTimeout(() => {
-                        error();
-                    }, self.Conf.TABLE_REQUEST_TIMEOUT);
+                    this._timers[subject] = setTimeout(
+                        error,
+                        self.Conf.TABLE_REQUEST_TIMEOUT
+                    );
                 }
-            }).
-            then(success).
-            catch(error);
+            }).then(success).catch(error);
         }
 
         /**
@@ -309,6 +335,7 @@ TSFT.Conf = TSFT.Conf || (function() {
                 '.cells__hat_is_ordered{background:rgb(216, 219, 221)}' +
                 '.cells__hat_is_ordered.cells__hat_by_asc .cells__title::after{border-top-color:inherit;border-top-width:3px}' +
                 '.cells__hat_is_ordered.cells__hat_by_desc .cells__title::after{border-bottom-color:inherit;border-bottom-width:3px}' +
+                '.cells__hat_is_filterable .cells__filter{background:rgb(255, 255, 255)}' +
                 '.cells__body{font-size:13px;line-height:15px}' +
                 '.cells__body .cells__row:nth-child(odd){background:rgba(241, 244, 247, 0.7)}' +
                 '.cells__body .cells__cell{border-color:rgb(255, 255, 255) transparent rgba(237, 237, 237, 1) transparent;border-style:solid;border-width:1px 0}' +
@@ -330,8 +357,8 @@ TSFT.Conf = TSFT.Conf || (function() {
                 '.cells__title,.cells__total{padding-right:5px;padding-left:5px;-webkit-user-select:none;-moz-user-select:none;user-select:none}' +
                 '.cells__title{font-size:10px;line-height:15px;padding-top:2px}' +
                 '.cells__total{font-size:9px;font-weight:normal;padding-bottom:2px;margin-top:-2px}' +
-                '.cells__filter{font-weight:normal;cursor:not-allowed;height:14px;overflow:hidden;padding:2px 5px 2px 6px;margin:0 0 0 -1px;background:rgb(250, 250, 250);border-top:rgb(177, 177, 177) solid 1px}' +
-                '.cells__filter:focus{outline:none;background:rgb(255, 255, 255);box-shadow:0 1px 1px rgb(207, 207, 207) inset, 0 0 2px rgb(255, 217, 78), 0 0 2px rgb(255, 217, 78), 0 0 3px rgb(255, 217, 78)}' +
+                '.cells__filter{font-weight:normal;cursor:not-allowed;height:14px;overflow:hidden;padding:2px 5px 2px 6px;margin:0 0 0 -1px;border-top:rgb(177, 177, 177) solid 1px}' +
+                '.cells__filter:focus{outline:none;box-shadow:0 1px 1px rgb(207, 207, 207) inset, 0 0 2px rgb(255, 217, 78), 0 0 2px rgb(255, 217, 78), 0 0 3px rgb(255, 217, 78)}' +
                 '.cells__filter[contenteditable]{cursor:text}';
         }
 
@@ -342,7 +369,7 @@ TSFT.Conf = TSFT.Conf || (function() {
          * @const {string} WORKER_LINK
          */
         static get WORKER_LINK() {
-            return 'TSFT.Data.js?22';
+            return 'TSFT.Data.js?23';
         }
 
         /**
