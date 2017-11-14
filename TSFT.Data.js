@@ -58,13 +58,11 @@ var TSFTData = TSFTData || (function() {
                 order : []
             };
 
-            // 
-            this._data.sort = {
-            };
+            // Create sort properties stack
+            this._data.sort = {};
 
-            // 
-            this._data.filter = {
-            };
+            // Create filter properties stack
+            this._data.filter = {};
 
             // Add columns data
             args.cols.forEach(this._addCol, this);
@@ -186,6 +184,7 @@ var TSFTData = TSFTData || (function() {
                 title = raw.title !== undefined ? raw.title : raw.value + '',
                 value = raw.value;
 
+            // Transform raw value into needed
             switch (type) {
                 case 'Enum':
                     value = col.value.indexOf(value + '');
@@ -197,11 +196,13 @@ var TSFTData = TSFTData || (function() {
                     break;
             }
 
+            // Save cell data
             this._data.rows.cache.push({
                 title : title,
                 value : value
             });
 
+            // Count column total
             this._countTotal(raw, pos);
         }
 
@@ -261,7 +262,7 @@ var TSFTData = TSFTData || (function() {
         }
 
         /**
-         * 
+         * Count columns totals
          *
          * @private
          * @method _countCols
@@ -409,6 +410,7 @@ var TSFTData = TSFTData || (function() {
                 check = false,
                 al0   = '';
             this._data.test = true;
+
             // 
             this._clearTotals();
 
@@ -518,7 +520,7 @@ var TSFTData = TSFTData || (function() {
 
             // Fill temporary items stack with the values
             if (last) {
-                // 
+                // Get previous page positions
                 if (loop) {
                     this._data.rows.cache.bwd = {
                         from : start - limit,
@@ -526,7 +528,7 @@ var TSFTData = TSFTData || (function() {
                     }
                 }
 
-                // 
+                // Get next page positions
                 if (last < this._data.rows.order.length) {
                     this._data.rows.cache.fwd = {
                         from : last,
@@ -538,12 +540,13 @@ var TSFTData = TSFTData || (function() {
                     }
                 }
 
-                // 
+                // Get current page positions
                 this._data.rows.cache.now = {
                     from : loop,
                     till : last
                 };
 
+                // Select rows
                 this._data.rows.order.slice(loop, last).forEach(this._selectRow, this);
             } else {
                 this._data.rows.cache.list = null;
@@ -574,7 +577,6 @@ var TSFTData = TSFTData || (function() {
                 id = pos + 1;
 
             if (typeof data == 'number') {
-                // 
                 data = this._data.rows.items[data];
                 data = data instanceof Array ? data[id] : null;
                 data = data ? data.value : null;
@@ -591,7 +593,7 @@ var TSFTData = TSFTData || (function() {
         }
 
         /**
-         * 
+         * Count column totals
          *
          * @private
          * @method _countTotal
@@ -619,17 +621,25 @@ var TSFTData = TSFTData || (function() {
         }
 
         /**
-         * 
+         * Clear column totals
          *
          * @private
          * @method _clearTotal
          */
         _clearTotal(id) {
-            this._data.cols.items[id].avg = 0;
+            var
+                col = this._data.cols.items[id];
+
+            if (col.type == 'Number') {
+                col.avg = 0;
+                col.sum = 0;
+                col.max = 0;
+                col.min = 0;
+            }
         }
 
         /**
-         * 
+         * Clear columns totals
          *
          * @private
          * @method _clearTotals
@@ -639,7 +649,7 @@ var TSFTData = TSFTData || (function() {
         }
 
         /**
-         *
+         * Count columns totals
          *
          * @private
          * @method _countTotals
@@ -678,31 +688,31 @@ var TSFTData = TSFTData || (function() {
             }
 
             switch (event.data.request) {
-                // 
+                // Init module module data
                 case 'init data':
                     this._init(event.data.source);
                     break;
-                // 
+                // Count columns totals
                 case 'count cols':
                     this._countCols();
                     break;
-                // 
+                // Select cell data
                 case 'select cell':
                     this._selectCell(event.data.source.row, event.data.source.cell);
                     break;
-                // 
+                // Select columns data
                 case 'select cols':
                     this._selectCols();
                     break;
-                // 
+                // Order rows
                 case 'order rows':
                     this._orderRows(event.data.source.col, event.data.source.order);
                     break;
-                // 
+                // Filter rows
                 case 'filter rows':
                     this._filterRows(event.data.source.values);
                     break;
-                // 
+                // Select rows
                 case 'select rows':
                     this._selectRows(
                         event.data.source ? event.data.source.start : 0,

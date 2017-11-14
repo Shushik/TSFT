@@ -1231,8 +1231,18 @@ TSFT.View = TSFT.View || (function() {
             // Clear rows wrapper
             this._dom.rows.innerHTML = '';
 
-            // Hide table waiting indicator
-            this._halt();
+            // Setup iframe and table sizes and
+            // hide table waiting indicator
+            setTimeout(() => {
+                this._adjust();
+                this._halt();
+            }, self.parent.Conf.TABLE_ROWS_LIMIT);
+
+            // Send action response
+            self.postMessage({
+                slug     : this._slug,
+                response : 'render none'
+            });
         }
 
         /**
