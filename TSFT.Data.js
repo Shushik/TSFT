@@ -633,8 +633,8 @@ var TSFTData = TSFTData || (function() {
             if (col.type == 'Number') {
                 col.avg = 0;
                 col.sum = 0;
-                col.max = 0;
-                col.min = 0;
+                col.max = undefined;
+                col.min = undefined;
             }
         }
 

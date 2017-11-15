@@ -40,6 +40,7 @@ var TSFT = TSFT || (function() {
                 request : 'init data',
                 source  : {
                               slug : this._slug,
+                              sort : args.sort,
                               cols : args.cols,
                               rows : args.rows
                           }
@@ -369,7 +370,7 @@ TSFT.Conf = TSFT.Conf || (function() {
          * @const {string} WORKER_LINK
          */
         static get WORKER_LINK() {
-            return 'TSFT.Data.js?23';
+            return 'TSFT.Data.js?24';
         }
 
         /**
@@ -1183,9 +1184,6 @@ TSFT.View = TSFT.View || (function() {
 
             // Clear cache stack
             this._dom.cache = null;
-
-            // Setup iframe and table sizes
-            this._adjust();
 
             // Send action response
             self.postMessage({
